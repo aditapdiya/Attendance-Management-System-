@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Attendance records{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Attendance records</h1></div>
+<div class="card"><div class="card-body border-bottom"><form class="row g-2" method="get">
+  <div class="col-md-2"><input type="date" name="from" class="form-control" value="{{ f.from }}" title="From"></div>
+  <div class="col-md-2"><input type="date" name="to" class="form-control" value="{{ f.to }}" title="To"></div>
+  <div class="col-md-3"><select name="employee" class="form-select"><option value="">All employees</option>{% for e in employees %}<option value="{{ e.pk }}" {% if f.employee == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select name="status" class="form-select"><option value="">All statuses</option>{% for v, l in statuses %}<option value="{{ v }}" {% if f.status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill">Filter</button><a class="btn btn-light border" href="{% url 'attendance:history' %}">Reset</a></div></form></div>
+<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>Remarks</th><th>Marked by</th><th>Updated</th></tr></thead><tbody>
+{% for a in page %}<tr><td>{{ a.attendance_date|date:"D, d M Y" }}</td><td><a href="{% url 'employees:profile' a.employee.pk %}">{{ a.employee.name }}</a> <small class="text-muted">{{ a.employee.employee_code }}</small></td><td>{% badge a.status %}</td><td class="text-muted">{{ a.remarks }}</td><td>{{ a.marked_by.username|default:"—" }}</td><td class="small text-muted">{{ a.updated_at|date:"d M H:i" }}</td></tr>
+{% empty %}<tr><td colspan="6"><div class="empty"><i class="bi bi-calendar-x"></i>No records match these filters.</div></td></tr>{% endfor %}</tbody></table></div>{% include "_pagination.html" %}</div>
+{% endblock %}

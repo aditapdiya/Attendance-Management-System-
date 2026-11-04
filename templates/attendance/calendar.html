@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Attendance calendar{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Monthly attendance calendar</h1>
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <a class="btn btn-light border" href="?year={{ prev.year }}&amp;month={{ prev.month }}{% if emp %}&amp;employee={{ emp.pk }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
+    <strong class="px-2">{{ month_name }} {{ year }}</strong>
+    <a class="btn btn-light border" href="?year={{ next.year }}&amp;month={{ next.month }}{% if emp %}&amp;employee={{ emp.pk }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
+    <input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="{{ month }}">
+    <select name="employee" class="form-select" style="min-width:220px" onchange="this.form.submit()"><option value="">All employees (daily totals)</option>
+      {% for e in employees %}<option value="{{ e.pk }}" {% if emp and emp.pk == e.pk %}selected{% endif %}>{{ e.name }} ({{ e.employee_code }})</option>{% endfor %}</select></form></div>
+<div class="card"><div class="table-responsive"><table class="table cal mb-0"><thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody>
+{% for week in weeks %}<tr>{% for c in week %}
+  <td class="{% if not c.in_month %}out{% elif c.holiday %}hol{% endif %}">
+    <div class="dn">{{ c.date.day }}</div>
+    {% if c.in_month %}
+      {% if c.holiday %}<span class="text-primary small"><i class="bi bi-brightness-high"></i> Paid holiday</span>
+      {% elif emp %}
+        {% if c.status %}<span class="pill pill-{{ c.status }}">{{ c.status|status_label }}</span>
+        {% elif c.missing %}<span class="pill pill-MISSING">Not marked</span>{% endif %}
+      {% else %}{% if not c.future %}
+        {% if c.counts.PRESENT %}<div><span class="pill pill-PRESENT">P {{ c.counts.PRESENT }}</span></div>{% endif %}
+        {% if c.counts.ABSENT %}<div><span class="pill pill-ABSENT">A {{ c.counts.ABSENT }}</span></div>{% endif %}
+        {% if c.counts.HALF_DAY or c.counts.PAID_LEAVE or c.counts.UNPAID_LEAVE %}<div class="text-muted">½ {{ c.counts.HALF_DAY }} · PL {{ c.counts.PAID_LEAVE }} · UL {{ c.counts.UNPAID_LEAVE }}</div>{% endif %}
+        {% if c.unmarked %}<div><span class="pill pill-MISSING">{{ c.unmarked }} unmarked</span></div>{% endif %}
+        <a class="stretched-link" href="{% url 'attendance:daily' %}?date={{ c.date|date:'Y-m-d' }}" aria-label="Open day"></a>{% endif %}
+      {% endif %}
+    {% endif %}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div></div>
+<div class="d-flex flex-wrap gap-3 mt-3 small"><span class="pill pill-PRESENT">Present</span><span class="pill pill-ABSENT">Absent</span><span class="pill pill-HALF_DAY">Half day</span><span class="pill pill-PAID_LEAVE">Paid leave</span><span class="pill pill-UNPAID_LEAVE">Unpaid leave</span><span class="pill pill-MISSING">Not marked</span></div>
+{% endblock %}

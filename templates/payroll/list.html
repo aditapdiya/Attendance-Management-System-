@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Monthly payroll{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Monthly payroll</h1><small class="text-muted">{{ month_name }} {{ y }} · {{ month_over|yesno:"month complete,month in progress" }}</small></div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if perms.payroll.add_monthlypayroll and n_unsaved %}<form method="post" action="{% url 'payroll:generate' %}" data-confirm="Save draft payroll for {{ n_unsaved }} employee(s) for {{ month_name }} {{ y }}?">{% csrf_token %}<input type="hidden" name="year" value="{{ y }}"><input type="hidden" name="month" value="{{ m }}"><button class="btn btn-primary"><i class="bi bi-calculator me-1"></i>Save drafts ({{ n_unsaved }})</button></form>{% endif %}
+    {% if perms.payroll.finalize_payroll and n_draft %}<form method="post" action="{% url 'payroll:finalize_all' %}" data-confirm="Finalize all draft payrolls for {{ month_name }} {{ y }}? Finalized payroll is locked. Payrolls that need review or have unmarked attendance will be skipped and reported." data-confirm-label="Finalize">{% csrf_token %}<input type="hidden" name="year" value="{{ y }}"><input type="hidden" name="month" value="{{ m }}"><button class="btn btn-success"><i class="bi bi-lock me-1"></i>Finalize all drafts ({{ n_draft }})</button></form>{% endif %}
+    <div class="dropdown"><button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Export</button><ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="{% url 'reports:download' %}?type=monthly_payroll&amp;period={{ y }}-{{ m|stringformat:'02d' }}&amp;fmt=xlsx"><i class="bi bi-file-earmark-excel me-2"></i>Excel</a></li>
+      <li><a class="dropdown-item" href="{% url 'reports:download' %}?type=monthly_payroll&amp;period={{ y }}-{{ m|stringformat:'02d' }}&amp;fmt=pdf"><i class="bi bi-file-earmark-pdf me-2"></i>PDF</a></li></ul></div>
+  </div></div>
+
+<div class="card mb-3"><div class="card-body"><form class="row g-2 align-items-end" method="get">
+  <div class="col-6 col-md-3"><label class="form-label">Month</label><select name="month" class="form-select" onchange="this.form.submit()">{% for i, n in months %}<option value="{{ i }}" {% if i == m %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-md-2"><label class="form-label">Year</label><select name="year" class="form-select" onchange="this.form.submit()">{% for yy in years %}<option {% if yy == y %}selected{% endif %}>{{ yy }}</option>{% endfor %}</select></div>
+</form></div></div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="card stat"><div class="icon bg-soft-blue"><i class="bi bi-cash"></i></div><div><div class="value fs-5">{{ tot.gross|inr }}</div><div class="lbl">Gross salary</div></div></div></div>
+  <div class="col-md-4"><div class="card stat"><div class="icon bg-soft-red"><i class="bi bi-dash-circle"></i></div><div><div class="value fs-5">{{ tot.ded|inr }}</div><div class="lbl">Deductions</div></div></div></div>
+  <div class="col-md-4"><div class="card stat"><div class="icon bg-soft-green"><i class="bi bi-wallet"></i></div><div><div class="value fs-5">{{ tot.net|inr }}</div><div class="lbl">Net payable</div></div></div></div></div>
+
+<div class="card"><div class="table-responsive"><table class="table table-hover"><thead><tr>
+  <th>ID</th><th>Employee</th><th class="num">Salary</th><th class="num">Days</th><th class="num">Present</th><th class="num">Absent</th><th class="num">Half</th><th class="num">PL</th><th class="num">UL</th><th class="num">Deductions</th><th class="num">Net salary</th><th>Status</th><th></th></tr></thead><tbody>
+{% for r in rows %}{% with s=r.p|default:r.calc %}
+  {% if r.error %}<tr><td>{{ r.emp.employee_code }}</td><td>{{ r.emp.name }}</td><td colspan="11" class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>{{ r.error }}</td></tr>
+  {% else %}<tr class="{% if not r.p %}text-muted{% endif %}">
+    <td class="fw-semibold">{{ r.emp.employee_code }}</td><td><a class="text-decoration-none fw-medium" href="{% url 'employees:profile' r.emp.pk %}">{{ r.emp.name }}</a></td>
+    <td class="num">{{ s.salary_snapshot|inr }}</td><td class="num">{{ s.total_calendar_days }}</td><td class="num">{{ s.present_days|days }}</td><td class="num">{{ s.absent_days|days }}</td><td class="num">{{ s.half_days|days }}</td><td class="num">{{ s.paid_leave_days|days }}</td><td class="num">{{ s.unpaid_leave_days|days }}</td>
+    <td class="num text-danger">{{ s.deductions|inr }}</td><td class="num fw-bold">{{ s.net_salary|inr }}</td>
+    <td class="text-nowrap">{% if r.p %}{% if r.p.is_final %}{% badge 'FINALIZED' %}{% else %}{% badge 'DRAFT' %}{% endif %}{% if r.p.needs_review %} <span class="badge text-bg-danger" title="Attendance or salary changed after calculation. Recalculate.">Review</span>{% endif %}{% else %}<span class="badge text-bg-light border">Preview</span>{% endif %}
+      {% if s.missing_days %}<span class="badge text-bg-warning" title="{{ s.missing_days }} working day(s) with no attendance"><i class="bi bi-exclamation-triangle"></i> {{ s.missing_days }}</span>{% endif %}</td>
+    <td class="text-end text-nowrap">{% if r.p %}<a class="btn btn-sm btn-light border" href="{% url 'payroll:detail' r.p.pk %}" title="Details"><i class="bi bi-eye"></i></a> <a class="btn btn-sm btn-light border" href="{% url 'payroll:slip' r.p.pk %}" title="Salary slip"><i class="bi bi-receipt"></i></a>
+      {% elif perms.payroll.add_monthlypayroll %}<form method="post" action="{% url 'payroll:generate' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="year" value="{{ y }}"><input type="hidden" name="month" value="{{ m }}"><input type="hidden" name="employee" value="{{ r.emp.pk }}"><button class="btn btn-sm btn-outline-primary">Save draft</button></form>{% endif %}</td></tr>{% endif %}
+{% endwith %}{% empty %}<tr><td colspan="13"><div class="empty"><i class="bi bi-cash-stack"></i>No eligible employees for this month.</div></td></tr>{% endfor %}
+</tbody>{% if rows %}<tfoot><tr><td colspan="9">Totals</td><td class="num">{{ tot.ded|inr }}</td><td class="num">{{ tot.net|inr }}</td><td colspan="2"></td></tr></tfoot>{% endif %}</table></div></div>
+<p class="text-muted small mt-3"><i class="bi bi-info-circle me-1"></i>Rows marked <em>Preview</em> are calculated live from current attendance and are not saved. Sundays/weekly holidays are paid; unmarked working days (⚠) must be marked before finalizing.</p>
+{% endblock %}

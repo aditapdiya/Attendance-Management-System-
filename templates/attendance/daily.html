@@ -1,0 +1,86 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Daily attendance{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Daily attendance</h1><small class="text-muted">{{ d|date:"l, d F Y" }}</small></div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <form method="get" class="d-flex gap-1 align-items-center">
+      <a class="btn btn-light border" title="Previous day" href="?date={{ d|date:'Y-m-d' }}&amp;prev=1" onclick="event.preventDefault();shiftDay(-1)"><i class="bi bi-chevron-left"></i></a>
+      <input type="date" id="dateInput" name="date" value="{{ d|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" class="form-control" onchange="this.form.submit()">
+      <a class="btn btn-light border" title="Next day" href="#" onclick="event.preventDefault();shiftDay(1)"><i class="bi bi-chevron-right"></i></a></form>
+    {% if can_add and not counts.holiday and not is_future %}
+    <form method="post" action="{% url 'attendance:mark_all_present' %}" data-confirm="Mark all active employees who have no status as PRESENT for {{ d|date:'d M Y' }}? Statuses already recorded will not be changed.">{% csrf_token %}
+      <input type="hidden" name="date" value="{{ d|date:'Y-m-d' }}"><button class="btn btn-success btn-lg"><i class="bi bi-check-all me-1"></i>MARK ALL PRESENT</button></form>
+    <button class="btn btn-primary" id="saveAll"><i class="bi bi-save me-1"></i>Save attendance</button>{% endif %}
+    <div class="dropdown"><button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Export</button><ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" href="{% url 'reports:download' %}?type=daily_attendance&amp;date={{ d|date:'Y-m-d' }}&amp;fmt=xlsx"><i class="bi bi-file-earmark-excel me-2"></i>Excel</a></li>
+      <li><a class="dropdown-item" href="{% url 'reports:download' %}?type=daily_attendance&amp;date={{ d|date:'Y-m-d' }}&amp;fmt=pdf"><i class="bi bi-file-earmark-pdf me-2"></i>PDF</a></li></ul></div>
+  </div></div>
+
+{% if counts.holiday %}<div class="alert alert-info"><i class="bi bi-brightness-high me-1"></i><strong>{{ d|date:"l" }} is a paid weekly holiday.</strong> No attendance entry is needed and no salary is deducted.</div>{% endif %}
+{% if is_future %}<div class="alert alert-warning">Attendance cannot be recorded for future dates.</div>{% endif %}
+
+<div class="row g-2 mb-3 text-center">
+  <div class="col-4 col-lg"><div class="card py-2"><div class="fs-4 fw-bold" id="cnt-total">{{ counts.total }}</div><small class="text-muted">Total</small></div></div>
+  <div class="col-4 col-lg"><div class="card py-2"><div class="fs-4 fw-bold text-success" id="cnt-PRESENT">{{ counts.PRESENT }}</div><small class="text-muted">Present</small></div></div>
+  <div class="col-4 col-lg"><div class="card py-2"><div class="fs-4 fw-bold text-danger" id="cnt-ABSENT">{{ counts.ABSENT }}</div><small class="text-muted">Absent</small></div></div>
+  <div class="col-4 col-lg"><div class="card py-2"><div class="fs-4 fw-bold" style="color:#b45309" id="cnt-HALF_DAY">{{ counts.HALF_DAY }}</div><small class="text-muted">Half day</small></div></div>
+  <div class="col-4 col-lg"><div class="card py-2"><div class="fs-4 fw-bold text-primary" id="cnt-PAID_LEAVE">{{ counts.PAID_LEAVE }}</div><small class="text-muted">Paid leave</small></div></div>
+  <div class="col-4 col-lg"><div class="card py-2"><div class="fs-4 fw-bold text-secondary" id="cnt-UNPAID_LEAVE">{{ counts.UNPAID_LEAVE }}</div><small class="text-muted">Unpaid leave</small></div></div>
+  <div class="col-12 col-lg"><div class="card py-2 border-danger-subtle"><div class="fs-4 fw-bold text-danger" id="cnt-not_marked">{{ counts.not_marked }}</div><small class="text-muted">Not marked</small></div></div>
+</div>
+
+<div class="card">
+  <div class="card-body border-bottom"><form class="row g-2" method="get"><input type="hidden" name="date" value="{{ d|date:'Y-m-d' }}">
+    <div class="col-md-6"><div class="input-group"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input class="form-control" name="q" value="{{ q }}" placeholder="Search employee name or ID"></div></div>
+    <div class="col-md-3"><select class="form-select" name="status" onchange="this.form.submit()"><option value="">All statuses</option>
+      {% for v, l in statuses %}<option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}<option value="NOT_MARKED" {% if status == 'NOT_MARKED' %}selected{% endif %}>Not marked</option></select></div>
+    <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill">Search</button><a class="btn btn-light border" href="?date={{ d|date:'Y-m-d' }}">Reset</a></div></form></div>
+  <div class="table-responsive"><table class="table table-hover align-middle" id="attTable"><thead><tr><th>Employee ID</th><th>Employee name</th><th>Designation</th><th>Attendance status</th><th>Remarks</th><th>Last updated</th><th>Actions</th></tr></thead><tbody>
+  {% for r in rows %}{% with e=r.emp rec=r.rec %}
+    <tr data-emp="{{ e.pk }}" data-orig="{% if rec %}{{ rec.status }}{% endif %}" data-orig-rem="{{ rec.remarks }}">
+      <td class="fw-semibold">{{ e.employee_code }}</td><td><a class="text-decoration-none fw-medium" href="{% url 'employees:profile' e.pk %}">{{ e.name }}</a><div class="small text-muted">{{ e.phone_number }}</div></td><td>{{ e.designation }}</td>
+      <td>{% if r.locked %}{% badge r.status %} <i class="bi bi-lock-fill text-muted" title="Payroll finalized for this month"></i>
+        {% else %}<select class="form-select form-select-sm att-select s-{{ rec.status }}" {% if counts.holiday or is_future or not can_add %}disabled{% endif %}>
+          <option value="">— Not marked —</option>{% for v, l in statuses %}<option value="{{ v }}" {% if rec.status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>{% endif %}</td>
+      <td><input type="text" class="form-control form-control-sm remarks" maxlength="255" value="{{ rec.remarks }}" placeholder="Optional" {% if r.locked or counts.holiday or is_future or not can_add %}disabled{% endif %}></td>
+      <td class="small text-muted upd">{% if rec %}{{ rec.updated_at|date:"d M H:i" }}{% if rec.marked_by %}<br>{{ rec.marked_by.username }}{% endif %}{% else %}—{% endif %}</td>
+      <td><a class="btn btn-sm btn-light border" href="{% url 'attendance:calendar' %}?employee={{ e.pk }}&amp;year={{ d.year }}&amp;month={{ d.month }}" title="Monthly calendar"><i class="bi bi-calendar3"></i></a></td></tr>
+  {% endwith %}{% empty %}<tr><td colspan="7"><div class="empty"><i class="bi bi-people"></i>No active employees match.</div></td></tr>{% endfor %}
+  </tbody></table></div>{% include "_pagination.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const D = "{{ d|date:'Y-m-d' }}", API = "{% url 'attendance:api_save' %}";
+function shiftDay(n){ const x = new Date(D + 'T00:00:00'); x.setDate(x.getDate()+n); if (x > new Date()) return;
+  const p = new URLSearchParams(location.search); p.set('date', x.toLocaleDateString('en-CA')); location.search = p.toString(); }
+const rows = () => [...document.querySelectorAll('#attTable tbody tr[data-emp]')];
+const item = tr => ({employee: +tr.dataset.emp, status: tr.querySelector('select')?.value ?? '', remarks: tr.querySelector('.remarks')?.value ?? ''});
+function paint(sel){ sel.className = sel.className.replace(/\bs-\S*/g, '').trim() + ' s-' + sel.value; }
+function setCounts(c){ for (const k of ['total','PRESENT','ABSENT','HALF_DAY','PAID_LEAVE','UNPAID_LEAVE','not_marked']) { const el = document.getElementById('cnt-'+k); if (el) el.textContent = c[k]; } }
+async function save(trs, quiet){
+  trs.forEach(t => t.classList.add('saving'));
+  try {
+    const res = await postJSON(API, {date: D, items: trs.map(item)});
+    const errs = new Map((res.errors||[]).map(e => [e.employee, e.error]));
+    (res.saved||[]).forEach(s => { const tr = trs.find(t => +t.dataset.emp === s.employee); if (!tr) return;
+      tr.dataset.orig = tr.querySelector('select').value; tr.dataset.origRem = tr.querySelector('.remarks').value;
+      if (s.updated) tr.querySelector('.upd').textContent = s.updated; else if (s.result === 'cleared') tr.querySelector('.upd').textContent = '—';
+      if (s.result !== 'unchanged') { tr.classList.add('saved-flash'); setTimeout(()=>tr.classList.remove('saved-flash'), 1000); } });
+    errs.forEach((msg, id) => { const tr = trs.find(t => +t.dataset.emp === id); if (tr) { const s = tr.querySelector('select'); s.value = tr.dataset.orig; paint(s); tr.querySelector('.remarks').value = tr.dataset.origRem; showToast(msg, 'error'); } });
+    if (res.counts) setCounts(res.counts);
+    const n = (res.saved||[]).filter(s => s.result !== 'unchanged').length;
+    if (!quiet) showToast(errs.size ? `Saved ${n}; ${errs.size} could not be saved.` : (n ? `Attendance saved (${n} updated).` : 'Nothing to save — everything is already up to date.'), errs.size ? 'warning' : 'success');
+  } catch (e) { showToast(e.message || 'Could not save. Please try again.', 'error'); }
+  finally { trs.forEach(t => t.classList.remove('saving')); }
+}
+document.addEventListener('change', e => {
+  const tr = e.target.closest('tr[data-emp]'); if (!tr) return;
+  if (e.target.matches('select')) { paint(e.target); save([tr], true); }
+  else if (e.target.matches('.remarks')) { if (!tr.querySelector('select').value) showToast('Choose a status before adding remarks.', 'info'); else save([tr], true); }
+});
+document.getElementById('saveAll')?.addEventListener('click', () => {
+  const todo = rows().filter(tr => tr.querySelector('select') && !tr.querySelector('select').disabled && (tr.querySelector('select').value || tr.dataset.orig));
+  if (!todo.length) return showToast('Nothing to save.', 'info');
+  save(todo, false);
+});
+</script>{% endblock %}

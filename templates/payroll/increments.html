@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Salary increments{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Salary increment management</h1></div>
+<div class="row g-3">
+  {% if form %}<div class="col-lg-4"><div class="card"><div class="card-header">Record salary revision</div><div class="card-body">
+    <form method="post" novalidate data-confirm="Record this salary revision? Salary history is never overwritten; payroll from the effective month will use the new salary.">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="mb-3"><label class="form-label">Employee</label>
+        <select name="employee" id="empSel" class="form-select" required><option value="">Select…</option>{% for e in form.fields.employee.queryset %}<option value="{{ e.pk }}" {% if form.employee.value|stringformat:"s" == e.pk|stringformat:"s" or emp_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.name }} ({{ e.employee_code }})</option>{% endfor %}</select>{% for e in form.employee.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+      <div class="mb-3"><label class="form-label">Current salary</label><input class="form-control" id="curSal" readonly placeholder="—"></div>
+      <div class="mb-3"><label class="form-label">{{ form.revised_salary.label }}</label>{{ form.revised_salary }}{% for e in form.revised_salary.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}<div class="form-text" id="incPreview"></div></div>
+      <div class="mb-3"><label class="form-label">{{ form.effective_month.label }}</label>{{ form.effective_month }}{% for e in form.effective_month.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}<div class="form-text">Takes effect from the 1st of this month.</div></div>
+      <div class="mb-3"><label class="form-label">Reason</label>{{ form.reason }}</div>
+      <button class="btn btn-primary w-100"><i class="bi bi-graph-up-arrow me-1"></i>Record revision</button></form></div></div></div>{% endif %}
+  <div class="{% if form %}col-lg-8{% else %}col-12{% endif %}"><div class="card"><div class="card-header d-flex justify-content-between align-items-center">Revision history
+      <form method="get"><select class="form-select form-select-sm" name="employee" onchange="this.form.submit()"><option value="">All employees</option>{% for e in employees %}<option value="{{ e.pk }}" {% if emp_id == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></form></div>
+    <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Employee</th><th>Effective</th><th class="num">Previous</th><th class="num">Revised</th><th class="num">Increment</th><th class="num">%</th><th>Reason</th><th>By / on</th></tr></thead><tbody>
+    {% for r in page %}<tr><td><a href="{% url 'employees:profile' r.employee.pk %}">{{ r.employee.name }}</a></td><td>{{ r.effective_from|date:"M Y" }}</td><td class="num">{{ r.previous_salary|inr }}</td><td class="num fw-semibold">{{ r.revised_salary|inr }}</td>
+      <td class="num {% if r.increment_amount and r.increment_amount > 0 %}text-success{% elif r.increment_amount %}text-danger{% endif %}">{% if r.increment_amount is not None %}{{ r.increment_amount|inr }}{% else %}—{% endif %}</td><td class="num">{% if r.increment_percent is not None %}{{ r.increment_percent }}%{% else %}—{% endif %}</td>
+      <td>{{ r.reason|default:"—" }}</td><td class="small text-muted">{{ r.created_by.username|default:"—" }}<br>{{ r.created_at|date:"d M Y" }}</td></tr>
+    {% empty %}<tr><td colspan="8"><div class="empty"><i class="bi bi-graph-up"></i>No revisions found.</div></td></tr>{% endfor %}</tbody></table></div>{% include "_pagination.html" %}</div></div>
+</div>
+{{ current|json_script:"cur-data" }}
+{% endblock %}
+{% block scripts %}<script>
+const CUR = JSON.parse(document.getElementById('cur-data').textContent);
+const sel = document.getElementById('empSel'), cur = document.getElementById('curSal'), rev = document.querySelector('[name=revised_salary]'), prev = document.getElementById('incPreview');
+const fmt = n => '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+function upd(){ if(!sel) return; const c = CUR[sel.value]; cur.value = c ? fmt(c) : ''; const r = parseFloat(rev.value);
+  prev.textContent = (c && r) ? `Change: ${fmt(r - c)} (${((r - c) / c * 100).toFixed(2)}%)` : ''; }
+sel?.addEventListener('change', upd); rev?.addEventListener('input', upd); upd();
+</script>{% endblock %}

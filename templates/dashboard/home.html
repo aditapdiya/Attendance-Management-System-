@@ -1,0 +1,85 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Dashboard</h1><small class="text-muted">{{ today|date:"l, d F Y" }}</small></div></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-blue"><i class="bi bi-people"></i></div><div><div class="value">{{ stats.total }}</div><div class="lbl">Total employees</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-green"><i class="bi bi-person-check"></i></div><div><div class="value">{{ stats.active }}</div><div class="lbl">Active employees</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-slate"><i class="bi bi-person-dash"></i></div><div><div class="value">{{ stats.inactive }}</div><div class="lbl">Inactive employees</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-green"><i class="bi bi-check2-circle"></i></div><div><div class="value">{{ stats.present }}</div><div class="lbl">Present today</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-red"><i class="bi bi-x-circle"></i></div><div><div class="value">{{ stats.absent }}</div><div class="lbl">Absent today</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-navy"><i class="bi bi-calendar-heart"></i></div><div><div class="value">{{ stats.leave }}</div><div class="lbl">On leave today</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-amber"><i class="bi bi-hourglass-split"></i></div><div><div class="value">{{ stats.half }}</div><div class="lbl">Half-day today</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-blue"><i class="bi bi-cash-stack"></i></div><div><div class="value fs-5">{{ stats.payroll_total|inr }}</div><div class="lbl">{{ today|date:"F" }} payroll ({{ stats.payroll_n }} record{{ stats.payroll_n|pluralize }})</div></div></div></div>
+  <div class="col-6 col-md-4 col-xl-3"><div class="card stat"><div class="icon bg-soft-red"><i class="bi bi-wallet2"></i></div><div><div class="value fs-5">{{ stats.pending_amt|inr }}</div><div class="lbl">Pending salary payments ({{ stats.pending_n }})</div></div></div></div>
+</div>
+{% if stats.holiday %}<div class="alert alert-info py-2"><i class="bi bi-info-circle me-1"></i>Today is a paid weekly holiday. No attendance entry is required.</div>{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-8"><div class="card h-100">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">Attendance for the day
+      <form method="get" class="d-flex gap-2"><input type="date" name="date" value="{{ selected|date:'Y-m-d' }}" class="form-control form-control-sm" max="{{ today|date:'Y-m-d' }}" onchange="this.form.submit()"></form></div>
+    <div class="card-body">
+      {% if sel.holiday %}<div class="text-muted mb-3"><i class="bi bi-brightness-high me-1"></i>{{ selected|date:"l" }} is a paid weekly holiday.</div>{% endif %}
+      <div class="row text-center g-2 mb-3">
+        <div class="col"><div class="fs-4 fw-bold">{{ sel.total }}</div><small class="text-muted">Active</small></div>
+        <div class="col"><div class="fs-4 fw-bold text-success">{{ sel.PRESENT }}</div><small class="text-muted">Present</small></div>
+        <div class="col"><div class="fs-4 fw-bold text-danger">{{ sel.ABSENT }}</div><small class="text-muted">Absent</small></div>
+        <div class="col"><div class="fs-4 fw-bold" style="color:#b45309">{{ sel.HALF_DAY }}</div><small class="text-muted">Half day</small></div>
+        <div class="col"><div class="fs-4 fw-bold text-primary">{{ sel.PAID_LEAVE }}</div><small class="text-muted">Paid leave</small></div>
+        <div class="col"><div class="fs-4 fw-bold text-secondary">{{ sel.UNPAID_LEAVE }}</div><small class="text-muted">Unpaid leave</small></div>
+      </div>
+      {% if not sel.holiday %}<div class="d-flex justify-content-between small mb-1"><span>Attendance completion</span><strong>{{ sel.completion }}%</strong></div>
+      <div class="progress" style="height:10px"><div class="progress-bar bg-success" style="width:{{ sel.completion }}%"></div></div>
+      <small class="text-muted">{{ sel.not_marked }} employee{{ sel.not_marked|pluralize }} not marked yet.</small>{% endif %}
+    </div></div></div>
+  <div class="col-xl-4"><div class="card h-100"><div class="card-header">Quick actions</div><div class="card-body d-grid gap-2">
+    {% if perms.employees.add_employee %}<a class="btn btn-outline-primary text-start" href="{% url 'employees:add' %}"><i class="bi bi-person-plus me-2"></i>Add employee</a>{% endif %}
+    {% if perms.attendance.view_attendance %}<a class="btn btn-outline-primary text-start" href="{% url 'attendance:daily' %}?date={{ selected|date:'Y-m-d' }}"><i class="bi bi-calendar-check me-2"></i>Mark attendance</a>{% endif %}
+    {% if perms.attendance.add_attendance and not sel.holiday %}
+    <form method="post" action="{% url 'attendance:mark_all_present' %}" data-confirm="Mark every active employee without a status as PRESENT for {{ selected|date:'d M Y' }}? Existing statuses will not be changed.">{% csrf_token %}
+      <input type="hidden" name="date" value="{{ selected|date:'Y-m-d' }}"><input type="hidden" name="back" value="/"><button class="btn btn-success w-100 text-start"><i class="bi bi-check-all me-2"></i>Mark all present</button></form>{% endif %}
+    {% if perms.payroll.view_monthlypayroll %}<a class="btn btn-outline-primary text-start" href="{% url 'payroll:list' %}?year={{ today.year }}&month={{ today.month }}"><i class="bi bi-calculator me-2"></i>Calculate monthly salary</a>
+    <a class="btn btn-outline-primary text-start" href="{% url 'payroll:list' %}"><i class="bi bi-cash-stack me-2"></i>View payroll</a>{% endif %}
+    <a class="btn btn-outline-primary text-start" href="{% url 'reports:index' %}"><i class="bi bi-file-earmark-bar-graph me-2"></i>Generate reports</a>
+  </div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header">Attendance trend (6 months)</div><div class="card-body"><canvas id="trend" height="220"></canvas></div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Salary expenditure (6 months)</div><div class="card-body"><canvas id="spend" height="220"></canvas></div></div></div>
+  <div class="col-lg-3"><div class="card h-100"><div class="card-header">{{ today|date:"F" }}: attendance mix</div><div class="card-body"><canvas id="mix" height="220"></canvas></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card"><div class="card-header">Recently added employees</div><ul class="list-group list-group-flush">
+    {% for e in recent_employees %}<li class="list-group-item d-flex justify-content-between"><a href="{% url 'employees:profile' e.pk %}">{{ e.name }}</a><small class="text-muted">{{ e.designation }} · {{ e.created_at|date:"d M" }}</small></li>
+    {% empty %}<li class="list-group-item empty">No employees yet.</li>{% endfor %}</ul></div></div>
+  <div class="col-lg-6"><div class="card"><div class="card-header">Latest attendance updates</div><ul class="list-group list-group-flush">
+    {% for a in recent_attendance %}<li class="list-group-item d-flex justify-content-between align-items-center"><span>{{ a.employee.name }} <small class="text-muted">{{ a.attendance_date|date:"d M" }}</small></span>{% badge a.status %}</li>
+    {% empty %}<li class="list-group-item empty">No attendance recorded yet.</li>{% endfor %}</ul></div></div>
+  <div class="col-lg-6"><div class="card"><div class="card-header">Latest salary increments</div><ul class="list-group list-group-flush">
+    {% for r in recent_revisions %}<li class="list-group-item d-flex justify-content-between"><span>{{ r.employee.name }}</span><small>{{ r.previous_salary|inr }} → <strong>{{ r.revised_salary|inr }}</strong> <span class="text-muted">({{ r.effective_from|date:"M Y" }})</span></small></li>
+    {% empty %}<li class="list-group-item empty">No increments recorded.</li>{% endfor %}</ul></div></div>
+  <div class="col-lg-6"><div class="card"><div class="card-header">Recent salary payments</div><ul class="list-group list-group-flush">
+    {% for p in recent_payments %}<li class="list-group-item d-flex justify-content-between"><span>{{ p.payroll.employee.name }} <small class="text-muted">{{ p.payroll.period }}</small></span><strong>{{ p.amount_paid|inr }}</strong></li>
+    {% empty %}<li class="list-group-item empty">No payments recorded.</li>{% endfor %}</ul></div></div>
+</div>
+{{ charts|json_script:"chart-data" }}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const C = JSON.parse(document.getElementById('chart-data').textContent);
+Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+new Chart(trend, {type:'line', data:{labels:C.labels, datasets:[
+  {label:'Present', data:C.present, borderColor:'#16A34A', backgroundColor:'rgba(22,163,74,.12)', fill:true, tension:.3},
+  {label:'Absent', data:C.absent, borderColor:'#DC2626', backgroundColor:'rgba(220,38,38,.1)', fill:true, tension:.3}]},
+  options:{plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}}});
+new Chart(spend, {type:'bar', data:{labels:C.labels, datasets:[
+  {label:'Net payroll', data:C.net, backgroundColor:'#2563EB', borderRadius:4},
+  {label:'Paid', data:C.paid, backgroundColor:'#172554', borderRadius:4}]},
+  options:{plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true, ticks:{callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}});
+new Chart(mix, {type:'doughnut', data:{labels:['Present','Absent','Half day','Paid leave','Unpaid leave'], datasets:[{data:C.mix,
+  backgroundColor:['#16A34A','#DC2626','#F59E0B','#2563EB','#94a3b8']}]}, options:{plugins:{legend:{position:'bottom'}}, cutout:'62%'}});
+</script>{% endblock %}

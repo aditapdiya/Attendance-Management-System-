@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Employees{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Employees</h1>{% if perms.employees.add_employee %}<a class="btn btn-primary" href="{% url 'employees:add' %}"><i class="bi bi-person-plus me-1"></i>Add employee</a>{% endif %}</div>
+<div class="card">
+  <div class="card-body border-bottom"><form class="row g-2" method="get">
+    <div class="col-md-6"><div class="input-group"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input class="form-control" name="q" value="{{ q }}" placeholder="Search name, employee ID or phone"></div></div>
+    <div class="col-md-3"><select class="form-select" name="status" onchange="this.form.submit()"><option value="">All statuses</option><option value="active" {% if status == 'active' %}selected{% endif %}>Active</option><option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option></select></div>
+    <div class="col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill">Search</button><a class="btn btn-light border" href="{% url 'employees:list' %}">Reset</a></div></form></div>
+  <div class="table-responsive"><table class="table table-hover"><thead><tr><th>ID</th><th>Name</th><th>Designation</th><th>Phone</th><th>Joined</th><th class="num">Salary</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for e in page %}<tr>
+    <td class="fw-semibold">{{ e.employee_code }}</td><td><a class="text-decoration-none fw-medium" href="{% url 'employees:profile' e.pk %}">{{ e.name }}</a></td>
+    <td>{{ e.designation }}<div class="small text-muted">{{ e.department }}</div></td><td>{{ e.phone_number }}</td><td>{{ e.joining_date|date:"d M Y" }}</td>
+    <td class="num">{{ e.salary|inr }}</td><td>{% if e.is_active %}{% badge 'Active' %}{% else %}{% badge 'Inactive' %}{% endif %}</td>
+    <td class="text-end text-nowrap"><a class="btn btn-sm btn-light border" href="{% url 'employees:profile' e.pk %}" title="View"><i class="bi bi-eye"></i></a>
+      {% if perms.employees.change_employee %}<a class="btn btn-sm btn-light border" href="{% url 'employees:edit' e.pk %}" title="Edit"><i class="bi bi-pencil"></i></a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="8"><div class="empty"><i class="bi bi-people"></i>No employees found.{% if perms.employees.add_employee %} <a href="{% url 'employees:add' %}">Add the first employee</a>.{% endif %}</div></td></tr>{% endfor %}
+  </tbody></table></div>{% include "_pagination.html" %}
+</div>
+{% endblock %}

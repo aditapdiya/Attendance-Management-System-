@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}Reports{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Reports &amp; exports</h1></div>
+<div class="row g-3"><div class="col-lg-7"><div class="card"><div class="card-body">
+  <form method="get" action="{% url 'reports:download' %}" id="rf" class="row g-3">
+    <div class="col-12"><label class="form-label">Report</label><select name="type" id="rtype" class="form-select">{% for key, label, needs in reports %}<option value="{{ key }}" data-needs="{{ needs|join:' ' }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-6 need need-date"><label class="form-label">Date</label><input type="date" name="date" value="{{ today|date:'Y-m-d' }}" class="form-control"></div>
+    <div class="col-md-6 need need-month need-month_optional need-year"><label class="form-label">Month / period</label><input type="month" name="period" value="{{ month_value }}" class="form-control"><div class="form-text need need-month_optional">Tick “whole year” to ignore the month.</div></div>
+    <div class="col-md-6 need need-employee need-employee_optional"><label class="form-label">Employee</label><select name="employee" class="form-select"><option value="">All / select…</option>{% for e in employees %}<option value="{{ e.pk }}">{{ e.name }} ({{ e.employee_code }})</option>{% endfor %}</select></div>
+    <div class="col-md-6 need need-month_optional d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" name="whole_year" value="1" id="wy"><label class="form-check-label" for="wy">Whole year</label></div></div>
+    <div class="col-12 d-flex flex-wrap gap-2"><button name="fmt" value="html" class="btn btn-primary" data-noload><i class="bi bi-eye me-1"></i>Preview</button>
+      <button name="fmt" value="pdf" class="btn btn-outline-danger" data-noload><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
+      <button name="fmt" value="xlsx" class="btn btn-outline-success" data-noload><i class="bi bi-file-earmark-excel me-1"></i>Excel</button></div>
+  </form></div></div></div>
+  <div class="col-lg-5"><div class="card"><div class="card-header">About reports</div><div class="card-body small text-muted">
+    <p>Every report carries Vimal Agencies branding, the selected period, the generation date and totals where relevant.</p>
+    <p class="mb-0">Aadhaar numbers are never included in any report.</p></div></div></div></div>
+{% endblock %}
+{% block scripts %}<script>
+const t = document.getElementById('rtype');
+function sync(){ const needs = t.selectedOptions[0].dataset.needs.split(' ');
+  document.querySelectorAll('.need').forEach(el => { const cls = [...el.classList].filter(c => c.startsWith('need-')).map(c => c.slice(5)); el.style.display = cls.some(c => needs.includes(c)) ? '' : 'none'; }); }
+t.addEventListener('change', sync); sync();
+</script>{% endblock %}

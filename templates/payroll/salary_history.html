@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Salary history{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Salary history</h1>
+  <form method="get"><select class="form-select" name="employee" style="min-width:260px" onchange="this.form.submit()"><option value="">Select an employee…</option>{% for e in employees %}<option value="{{ e.pk }}" {% if emp and emp.pk == e.pk %}selected{% endif %}>{{ e.name }} ({{ e.employee_code }})</option>{% endfor %}</select></form></div>
+{% if emp %}
+<div class="row g-3">
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header">Timeline – {{ emp.name }}</div><div class="card-body"><ul class="timeline">
+    {% for r in revisions %}<li><div class="fw-semibold">{{ r.revised_salary|inr }} <small class="text-muted fw-normal">from {{ r.effective_from|date:"F Y" }}</small></div>
+      <small class="text-muted">{% if r.previous_salary %}{{ r.increment_amount|inr }} ({{ r.increment_percent }}%) · {% endif %}{{ r.reason|default:"—" }}</small></li>{% endfor %}</ul></div></div></div>
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header d-flex justify-content-between">Salary applied in payroll
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'reports:download' %}?type=employee_salary&amp;employee={{ emp.pk }}&amp;year={% now 'Y' %}&amp;fmt=pdf">Report</a></div>
+    <div class="table-responsive"><table class="table"><thead><tr><th>Month</th><th class="num">Salary used</th><th class="num">Net</th><th>Status</th></tr></thead><tbody>
+    {% for p in payrolls %}<tr><td><a href="{% url 'payroll:detail' p.pk %}">{{ p.period }}</a></td><td class="num">{{ p.salary_snapshot|inr }}</td><td class="num">{{ p.net_salary|inr }}</td><td>{% if p.is_final %}{% badge 'FINALIZED' %}{% else %}{% badge 'DRAFT' %}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4"><div class="empty">No payroll generated yet.</div></td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>{% else %}<div class="card"><div class="empty"><i class="bi bi-clock-history"></i>Choose an employee to see their salary history.</div></div>{% endif %}
+{% endblock %}

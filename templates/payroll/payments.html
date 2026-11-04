@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Salary payments{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Salary payments</h1>
+  <div class="d-flex gap-2"><a class="btn btn-outline-secondary" href="{% url 'reports:download' %}?type=pending_payments&amp;period={{ y }}-{{ m|stringformat:'02d' }}&amp;fmt=pdf"><i class="bi bi-file-earmark-pdf me-1"></i>Pending report</a></div></div>
+<div class="card mb-3"><div class="card-body"><form class="row g-2 align-items-end" method="get">
+  <div class="col-6 col-md-3"><label class="form-label">Month</label><select name="month" class="form-select" onchange="this.form.submit()">{% for i, n in months %}<option value="{{ i }}" {% if i == m %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-md-2"><label class="form-label">Year</label><select name="year" class="form-select" onchange="this.form.submit()">{% for yy in years %}<option {% if yy == y %}selected{% endif %}>{{ yy }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-md-3"><label class="form-label">Payment status</label><select name="status" class="form-select" onchange="this.form.submit()"><option value="">All</option><option {% if status == 'Pending' %}selected{% endif %}>Pending</option><option {% if status == 'Partially Paid' %}selected{% endif %}>Partially Paid</option><option {% if status == 'Paid' %}selected{% endif %}>Paid</option></select></div>
+  <div class="col-6 col-md-3"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="all" value="1" id="allm" {% if all_months %}checked{% endif %} onchange="this.form.submit()"><label class="form-check-label" for="allm">All months</label></div></div></form></div></div>
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="card stat"><div class="icon bg-soft-blue"><i class="bi bi-cash"></i></div><div><div class="value fs-5">{{ totals.net|inr }}</div><div class="lbl">Total salary payable</div></div></div></div>
+  <div class="col-md-4"><div class="card stat"><div class="icon bg-soft-green"><i class="bi bi-check2-circle"></i></div><div><div class="value fs-5">{{ totals.paid|inr }}</div><div class="lbl">Amount paid</div></div></div></div>
+  <div class="col-md-4"><div class="card stat"><div class="icon bg-soft-red"><i class="bi bi-hourglass"></i></div><div><div class="value fs-5">{{ totals.balance|inr }}</div><div class="lbl">Remaining balance</div></div></div></div></div>
+<div class="card"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Employee</th><th>Period</th><th class="num">Net salary</th><th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+{% for p in rows %}<tr><td><a class="text-decoration-none fw-medium" href="{% url 'payroll:detail' p.pk %}">{{ p.employee.name }}</a> <small class="text-muted">{{ p.employee.employee_code }}</small></td><td>{{ p.period }}</td><td class="num">{{ p.net_salary|inr }}</td><td class="num">{{ p.total_paid|inr }}</td><td class="num fw-semibold">{{ p.balance|inr }}</td><td>{% badge p.payment_status %}</td>
+  <td class="text-end">{% if perms.payroll.add_salarypayment and p.balance > 0 %}<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#payModal" data-modal-action="{% url 'payroll:pay' p.pk %}" data-name="{{ p.employee.name }}" data-period="{{ p.period }}" data-balance="{{ p.balance }}">Pay</button>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7"><div class="empty"><i class="bi bi-wallet2"></i>No finalized payroll found. Finalize payroll first, then record payments here.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header">Recent payments</div><div class="table-responsive"><table class="table"><thead><tr><th>Date</th><th>Employee</th><th>For</th><th>Mode</th><th>Reference</th><th class="num">Amount</th></tr></thead><tbody>
+{% for x in recent %}<tr><td>{{ x.payment_date|date:"d M Y" }}</td><td>{{ x.payroll.employee.name }}</td><td>{{ x.payroll.period }}</td><td>{{ x.get_payment_mode_display }}</td><td>{{ x.transaction_reference|default:"—" }}</td><td class="num">{{ x.amount_paid|inr }}</td></tr>
+{% empty %}<tr><td colspan="6"><div class="empty">No payments yet.</div></td></tr>{% endfor %}</tbody></table></div></div>
+{% include "payroll/_pay_modal.html" %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Audit log{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Audit log</h1></div>
+<div class="card"><div class="card-body border-bottom">
+<form class="row g-2" method="get"><div class="col-md-5"><input class="form-control" name="q" value="{{ q }}" placeholder="Search description or user"></div>
+<div class="col-md-4"><select class="form-select" name="action"><option value="">All actions</option>{% for a in actions %}<option {% if a == action %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+<div class="col-md-3"><button class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Filter</button></div></form></div>
+<div class="table-responsive"><table class="table table-hover"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Description</th></tr></thead><tbody>
+{% for l in page %}<tr><td class="text-nowrap">{{ l.timestamp|date:"d M Y H:i" }}</td><td>{{ l.user.username|default:"—" }}</td><td><span class="badge text-bg-light border">{{ l.action }}</span></td><td>{{ l.description }}</td></tr>
+{% empty %}<tr><td colspan="4"><div class="empty"><i class="bi bi-inbox"></i>No audit entries.</div></td></tr>{% endfor %}
+</tbody></table></div>{% include "_pagination.html" %}</div>
+{% endblock %}

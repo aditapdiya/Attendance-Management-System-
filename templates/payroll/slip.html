@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Salary slip{% endblock %}
+{% block content %}
+<div class="page-head no-print"><h1>Salary slip</h1><div class="d-flex gap-2"><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button><a class="btn btn-outline-secondary" href="{% url 'payroll:slip_pdf' p.pk %}"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a></div></div>
+<div class="card slip">
+  <div class="text-center mb-4"><h3 class="fw-bold mb-0" style="color:var(--navy)">{{ COMPANY_NAME|upper }}</h3><div class="text-muted">Salary slip for {{ p.period }}</div>{% if not p.is_final %}<div class="text-danger fw-bold">DRAFT — not finalized</div>{% endif %}</div>
+  <div class="row mb-3 small"><div class="col-6"><dl class="kv mb-0"><dt>Employee</dt><dd>{{ p.employee.name }} ({{ p.employee.employee_code }})</dd><dt>Designation</dt><dd>{{ p.employee.designation }}</dd></dl></div>
+    <div class="col-6"><dl class="kv mb-0"><dt>Department</dt><dd>{{ p.employee.department|default:"—" }}</dd><dt>Joining date</dt><dd>{{ p.employee.joining_date|date:"d M Y" }}</dd></dl></div></div>
+  <table class="table table-bordered"><thead><tr><th>Attendance</th><th class="num">Days</th></tr></thead><tbody>
+    <tr><td>Calendar days</td><td class="num">{{ p.total_calendar_days }}</td></tr><tr><td>Present</td><td class="num">{{ p.present_days|days }}</td></tr><tr><td>Absent</td><td class="num">{{ p.absent_days|days }}</td></tr>
+    <tr><td>Half days</td><td class="num">{{ p.half_days|days }}</td></tr><tr><td>Paid leave</td><td class="num">{{ p.paid_leave_days|days }}</td></tr><tr><td>Unpaid leave</td><td class="num">{{ p.unpaid_leave_days|days }}</td></tr>
+    <tr><td>Weekly holidays (paid)</td><td class="num">{{ p.holiday_days|days }}</td></tr>{% if p.pre_joining_days %}<tr><td>Days before joining</td><td class="num">{{ p.pre_joining_days|days }}</td></tr>{% endif %}
+    <tr class="fw-bold"><td>Payable days</td><td class="num">{{ p.payable_days|days }}</td></tr></tbody></table>
+  <table class="table table-bordered"><thead><tr><th>Earnings &amp; deductions</th><th class="num">Amount</th></tr></thead><tbody>
+    <tr><td>Monthly salary</td><td class="num">{{ p.gross_salary|inr }}</td></tr><tr><td>Per-day salary</td><td class="num">{{ p.per_day_salary|inr }}</td></tr>
+    <tr><td>Deduction ({{ p.unpaid_equivalent_days|days }} unpaid-equivalent day{{ p.unpaid_equivalent_days|pluralize }})</td><td class="num text-danger">− {{ p.deductions|inr }}</td></tr>
+    <tr class="table-primary fw-bold"><td>NET SALARY</td><td class="num fs-5">{{ p.net_salary|inr }}</td></tr></tbody></table>
+  <p class="text-muted small mb-0">This is a computer-generated salary slip.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}{{ emp.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div class="d-flex align-items-center gap-3"><div class="avatar" style="width:52px;height:52px;font-size:1.3rem">{{ emp.name|slice:":1" }}</div>
+  <div><h1>{{ emp.name }}</h1><small class="text-muted">{{ emp.employee_code }} · {{ emp.designation }}</small> {% if emp.is_active %}{% badge 'Active' %}{% else %}{% badge 'Inactive' %}{% endif %}</div></div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if perms.employees.change_employee %}<a class="btn btn-outline-primary" href="{% url 'employees:edit' emp.pk %}"><i class="bi bi-pencil me-1"></i>Edit</a>{% endif %}
+    {% if perms.payroll.add_salaryrevision %}<a class="btn btn-outline-primary" href="{% url 'payroll:increments' %}?employee={{ emp.pk }}"><i class="bi bi-graph-up-arrow me-1"></i>Salary increment</a>{% endif %}
+    {% if perms.employees.change_employee %}<form method="post" action="{% url 'employees:toggle' emp.pk %}" data-confirm="{% if emp.is_active %}Deactivate {{ emp.name }}? They will no longer appear in attendance or new payroll.{% else %}Reactivate {{ emp.name }}?{% endif %}" {% if emp.is_active %}data-confirm-danger="1"{% endif %}>{% csrf_token %}
+      <button class="btn {% if emp.is_active %}btn-outline-danger{% else %}btn-success{% endif %}">{% if emp.is_active %}<i class="bi bi-person-dash me-1"></i>Deactivate{% else %}<i class="bi bi-person-check me-1"></i>Reactivate{% endif %}</button></form>{% endif %}
+    {% if perms.employees.delete_employee %}<form method="post" action="{% url 'employees:delete' emp.pk %}" data-confirm="Permanently delete {{ emp.name }}? This only works for employees with no attendance or payroll history." data-confirm-danger="1" data-confirm-label="Delete">{% csrf_token %}<button class="btn btn-outline-secondary" title="Delete (only if no history)"><i class="bi bi-trash"></i></button></form>{% endif %}
+  </div></div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Personal information</div><div class="card-body"><dl class="kv mb-0">
+    <dt>Phone</dt><dd>{{ emp.phone_number }}</dd><dt>Aadhaar</dt><dd>{{ emp.masked_aadhaar }}</dd><dt>Address</dt><dd>{{ emp.address|default:"—"|linebreaksbr }}</dd></dl></div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Employment information</div><div class="card-body"><dl class="kv mb-0">
+    <dt>Designation / Department</dt><dd>{{ emp.designation }}{% if emp.department %} · {{ emp.department }}{% endif %}</dd><dt>Joining date</dt><dd>{{ emp.joining_date|date:"d M Y" }}</dd>
+    <dt>Notes</dt><dd>{{ emp.notes|default:"—"|linebreaksbr }}</dd></dl></div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Current salary &amp; this month</div><div class="card-body">
+    <div class="fs-2 fw-bold" style="color:var(--navy)">{{ current_salary|inr }}</div><small class="text-muted">per month, as of today</small><hr>
+    <div class="row text-center g-1"><div class="col"><div class="fw-bold text-success">{{ stats.PRESENT|default:0 }}</div><small class="text-muted">Present</small></div>
+    <div class="col"><div class="fw-bold text-danger">{{ stats.ABSENT|default:0 }}</div><small class="text-muted">Absent</small></div>
+    <div class="col"><div class="fw-bold" style="color:#b45309">{{ stats.HALF_DAY|default:0 }}</div><small class="text-muted">Half</small></div>
+    <div class="col"><div class="fw-bold text-primary">{{ stats.PAID_LEAVE|default:0 }}</div><small class="text-muted">PL</small></div>
+    <div class="col"><div class="fw-bold text-secondary">{{ stats.UNPAID_LEAVE|default:0 }}</div><small class="text-muted">UL</small></div></div></div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header">Salary revision timeline</div><div class="card-body">
+    <ul class="timeline">{% for r in revisions %}
+      <li class="{{ r.state }}">
+        <div class="fw-semibold">{{ r.revised_salary|inr }} <small class="text-muted fw-normal">from {{ r.effective_from|date:"M Y" }}</small></div>
+        <small class="text-muted">{% if r.previous_salary %}Was {{ r.previous_salary|inr }} (+{{ r.increment_amount|inr }}, {{ r.increment_percent }}%) · {% endif %}{{ r.reason|default:"—" }}{% if r.created_by %} · by {{ r.created_by.username }}{% endif %}</small></li>
+    {% endfor %}</ul></div></div></div>
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header">Monthly payroll history</div><div class="table-responsive"><table class="table"><thead><tr><th>Month</th><th class="num">Salary</th><th class="num">Deductions</th><th class="num">Net</th><th class="num">Balance</th><th>Status</th></tr></thead><tbody>
+    {% for p in payrolls %}<tr><td><a href="{% url 'payroll:detail' p.pk %}">{{ p.period }}</a></td><td class="num">{{ p.salary_snapshot|inr }}</td><td class="num">{{ p.deductions|inr }}</td><td class="num fw-semibold">{{ p.net_salary|inr }}</td>
+      <td class="num">{% if p.is_final %}{{ p.balance|inr }}{% else %}—{% endif %}</td><td>{% if p.is_final %}{% badge p.payment_status %}{% else %}{% badge 'DRAFT' %}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6"><div class="empty">No payroll generated yet.</div></td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card"><div class="card-header">Attendance history</div><div class="table-responsive"><table class="table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>
+    {% for a in att_page %}<tr><td>{{ a.attendance_date|date:"D, d M Y" }}</td><td>{% badge a.status %}</td><td class="text-muted">{{ a.remarks }}</td></tr>
+    {% empty %}<tr><td colspan="3"><div class="empty">No attendance recorded.</div></td></tr>{% endfor %}</tbody></table></div>
+    {% with page=att_page %}{% include "_pagination.html" %}{% endwith %}</div></div>
+  <div class="col-lg-6"><div class="card"><div class="card-header">Salary payment history</div><div class="table-responsive"><table class="table"><thead><tr><th>Date</th><th>For</th><th>Mode</th><th class="num">Amount</th></tr></thead><tbody>
+    {% for p in payments %}<tr><td>{{ p.payment_date|date:"d M Y" }}</td><td>{{ p.payroll.period }}</td><td>{{ p.get_payment_mode_display }}{% if p.transaction_reference %}<div class="small text-muted">{{ p.transaction_reference }}</div>{% endif %}</td><td class="num">{{ p.amount_paid|inr }}{% if p.is_adjustment %} <span class="badge text-bg-warning">adj</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4"><div class="empty">No payments recorded.</div></td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+{% endblock %}

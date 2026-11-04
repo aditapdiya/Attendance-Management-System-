@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load vimal %}{% block title %}Payroll {{ p.period }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ p.employee.name }} · {{ p.period }}</h1><small class="text-muted">{{ p.employee.employee_code }}</small> {% if p.is_final %}{% badge 'FINALIZED' %} {% badge p.payment_status %}{% else %}{% badge 'DRAFT' %}{% endif %}
+  {% if p.needs_review %}<span class="badge text-bg-danger">Review needed</span>{% endif %}</div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'payroll:slip' p.pk %}"><i class="bi bi-printer me-1"></i>Salary slip</a>
+    <a class="btn btn-outline-secondary" href="{% url 'payroll:slip_pdf' p.pk %}"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+    {% if not p.is_final %}
+      {% if perms.payroll.change_monthlypayroll %}<form method="post" action="{% url 'payroll:recalculate' p.pk %}" data-confirm="Recalculate this draft from the current attendance and salary?">{% csrf_token %}<button class="btn btn-{% if p.needs_review %}warning{% else %}outline-primary{% endif %}"><i class="bi bi-arrow-repeat me-1"></i>Recalculate</button></form>{% endif %}
+      {% if perms.payroll.finalize_payroll %}<form method="post" action="{% url 'payroll:finalize' p.pk %}" data-confirm="Finalize payroll for {{ p.employee.name }} ({{ p.period }})? Net salary {{ p.net_salary|inr }}. It will be locked." data-confirm-label="Finalize">{% csrf_token %}<button class="btn btn-success"><i class="bi bi-lock me-1"></i>Finalize</button></form>{% endif %}
+    {% else %}
+      {% if perms.payroll.add_salarypayment and p.balance > 0 %}<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#payModal" data-modal-action="{% url 'payroll:pay' p.pk %}" data-name="{{ p.employee.name }}" data-period="{{ p.period }}" data-balance="{{ p.balance }}"><i class="bi bi-wallet2 me-1"></i>Record payment</button>{% endif %}
+      {% if perms.payroll.unlock_payroll %}<button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#unlockModal"><i class="bi bi-unlock me-1"></i>Unlock</button>{% endif %}
+    {% endif %}
+  </div></div>
+
+{% if p.missing_days and not p.is_final %}<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1"></i><strong>{{ p.missing_days }} working day(s)</strong> have no attendance as of the last calculation. Mark them (or confirm they are unpaid) before finalizing.</div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Attendance breakdown</div><table class="table mb-0"><tbody>
+    <tr><td>Calendar days in {{ p.period }}</td><td class="num fw-semibold">{{ p.total_calendar_days }}</td></tr>
+    <tr><td>Present</td><td class="num">{{ p.present_days|days }}</td></tr><tr><td>Absent</td><td class="num">{{ p.absent_days|days }}</td></tr>
+    <tr><td>Half days</td><td class="num">{{ p.half_days|days }}</td></tr><tr><td>Paid leave</td><td class="num">{{ p.paid_leave_days|days }}</td></tr>
+    <tr><td>Unpaid leave</td><td class="num">{{ p.unpaid_leave_days|days }}</td></tr><tr><td>Weekly holidays (paid)</td><td class="num">{{ p.holiday_days|days }}</td></tr>
+    {% if p.pre_joining_days %}<tr><td>Days before joining (unpaid)</td><td class="num">{{ p.pre_joining_days|days }}</td></tr>{% endif %}
+    <tr class="table-light"><td class="fw-semibold">Payable days</td><td class="num fw-bold">{{ p.payable_days|days }}</td></tr></tbody></table></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Salary calculation</div><table class="table mb-0"><tbody>
+    <tr><td>Monthly salary (in force for {{ p.period }})</td><td class="num">{{ p.salary_snapshot|inr }}</td></tr>
+    <tr><td>Per-day salary <small class="text-muted">({{ p.salary_snapshot|inr }} ÷ {{ p.total_calendar_days }})</small></td><td class="num">{{ p.per_day_salary|inr }}</td></tr>
+    <tr><td>Unpaid-equivalent days <small class="text-muted">(absent + ½ × half-days + unpaid leave{% if p.pre_joining_days %} + pre-joining{% endif %})</small></td><td class="num">{{ p.unpaid_equivalent_days|days }}</td></tr>
+    <tr><td>Deductions</td><td class="num text-danger">− {{ p.deductions|inr }}</td></tr>
+    <tr class="table-primary"><td class="fw-bold">Net salary</td><td class="num fw-bold fs-5">{{ p.net_salary|inr }}</td></tr>
+    {% if p.is_final %}<tr><td>Paid so far</td><td class="num">{{ p.total_paid|inr }}</td></tr><tr><td>Remaining balance</td><td class="num fw-semibold">{{ p.balance|inr }}</td></tr>{% endif %}</tbody></table>
+    <div class="card-footer bg-white small text-muted">Generated {{ p.generated_at|date:"d M Y H:i" }}{% if p.generated_by %} by {{ p.generated_by.username }}{% endif %}{% if p.is_final %} · Finalized {{ p.finalized_at|date:"d M Y H:i" }} by {{ p.finalized_by.username|default:"—" }}{% endif %}</div></div></div>
+</div>
+
+{% if p.is_final %}
+<div class="card mt-3"><div class="card-header d-flex justify-content-between">Salary payments <span class="text-muted fw-normal">{{ p.total_paid|inr }} of {{ p.net_salary|inr }}</span></div>
+  <div class="table-responsive"><table class="table"><thead><tr><th>Date</th><th>Mode</th><th>Reference</th><th>Remarks</th><th>By</th><th class="num">Amount</th></tr></thead><tbody>
+  {% for x in payments %}<tr><td>{{ x.payment_date|date:"d M Y" }}</td><td>{{ x.get_payment_mode_display }}</td><td>{{ x.transaction_reference|default:"—" }}</td><td>{{ x.remarks }}{% if x.is_adjustment %} <span class="badge text-bg-warning">adjustment</span>{% endif %}</td><td>{{ x.recorded_by.username|default:"—" }}</td><td class="num fw-semibold">{{ x.amount_paid|inr }}</td></tr>
+  {% empty %}<tr><td colspan="6"><div class="empty"><i class="bi bi-wallet2"></i>No payments recorded yet.</div></td></tr>{% endfor %}</tbody></table></div></div>
+{% include "payroll/_pay_modal.html" %}
+<div class="modal fade" id="unlockModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form method="post" action="{% url 'payroll:unlock' p.pk %}" class="modal-content">{% csrf_token %}
+  <div class="modal-header"><h5 class="modal-title text-danger">Unlock finalized payroll</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><p>This returns the payroll to <strong>Draft</strong> and flags it for review. The action is recorded in the audit log. Unlocking is not possible once payments exist.</p>
+    <label class="form-label">Reason (required)</label><textarea name="reason" class="form-control" rows="3" minlength="5" required></textarea></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger">Unlock payroll</button></div></form></div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ title }}</h1></div>
+<form method="post" novalidate class="card"><div class="card-body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="row g-3">
+    {% for f in form %}
+    <div class="{% if f.name in 'address,notes' %}col-12{% else %}col-md-6{% endif %}">
+      <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}{% if f.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+      {{ f }}{% for e in f.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      {% if f.help_text %}<div class="form-text">{{ f.help_text }}</div>{% endif %}</div>
+    {% endfor %}
+    {% if employee %}<div class="col-12"><div class="alert alert-light border mb-0 small"><i class="bi bi-info-circle me-1"></i>Current salary {{ employee.salary }} is changed through <a href="{% url 'payroll:increments' %}">Salary increments</a> so that salary history is preserved.{% if employee.aadhaar_last4 %} Aadhaar on file: <strong>{{ employee.masked_aadhaar }}</strong>.{% endif %}</div></div>{% endif %}
+  </div></div>
+  <div class="card-footer bg-white d-flex gap-2"><button class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save</button><a class="btn btn-light border" href="{% if employee %}{% url 'employees:profile' employee.pk %}{% else %}{% url 'employees:list' %}{% endif %}">Cancel</a></div>
+</form>
+{% endblock %}
