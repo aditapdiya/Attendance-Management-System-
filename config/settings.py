@@ -20,15 +20,17 @@ ALLOWED_HOSTS = [
     h.strip()
     for h in os.getenv(
         "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,vimal-agencies-7422.up.railway.app"
+        "localhost,127.0.0.1"
     ).split(",")
     if h.strip()
 ]
+
+
 CSRF_TRUSTED_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "DJANGO_CSRF_TRUSTED_ORIGINS",
-        "https://vimal-agencies-7422.up.railway.app"
+        ""
     ).split(",")
     if o.strip()
 ]
